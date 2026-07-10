@@ -1,5 +1,7 @@
 # 민원 초안 생성 멀티 에이전트 (Civil Complaint Draft Generator)
 
+GitHub: https://github.com/okokp7608-wq/civil-complaint-agent
+
 민원(번호·제목·본문)을 입력받아 분류→검색→작성→검수 단계를 거쳐 답변 초안을 생성하는 멀티 에이전트 시스템.
 `82-report-generator` 하네스의 3계층 구조(오케스트레이터/도메인 스킬/에이전트)를 계승하고, 6종 멀티에이전트
 아키텍처 패턴을 지원하도록 설계했다. 상세 설계 배경은 `docs/adr/`의 ADR 문서와 `plan.md`를 참고.
