@@ -1641,16 +1641,16 @@ AI Agent 구조는 선택지가 많기 때문에,
 ---
 
 
-## 24. 추가 Flowchart: 보도자료 JSON → video.json 생성 검증 파이프라인
+## 24. 추가 Flowchart: 민원 JSON → video.json 생성 검증 파이프라인
 
-이 섹션은 보도자료 JSON을 입력으로 받아 숏폼 또는 홍보 영상 제작용 `video.json`을 생성하는 별도 하네스 흐름 예시입니다.  
+이 섹션은 민원 JSON을 입력으로 받아 숏폼 또는 홍보 영상 제작용 `video.json`을 생성하는 별도 하네스 흐름 예시입니다.  
 기존 민원 초안 생성 하네스와 동일하게 **Agent 호출 단계**와 **결정적 코드 검증 단계**를 분리하여, 생성 결과가 근거 없이 확정되지 않도록 설계합니다.
 
 ### 24.1 흐름도 목적
 
 이 Flowchart의 핵심 목적은 다음과 같습니다.
 
-1. 보도자료 원문(`body`)에서만 근거를 추출한다.
+1. 민원 원문(`body`)에서만 근거를 추출한다.
 2. `source_quote`가 실제 원문에 존재하는지 원장 검증으로 확인한다.
 3. 장면 기획, 내레이션, 시각 연출을 서로 다른 Agent가 담당한다.
 4. 병합 후 스키마와 임계값을 결정적 코드로 검증한다.
@@ -1667,7 +1667,7 @@ flowchart TD
         Ag(에이전트 노드 - LLM 호출)
     end
 
-    IN[보도자료 JSON 입력]
+    IN[민원 JSON 입력]
     ANALYST(press-analyst)
     LEDGER[원장 검증<br/>source_quote가 body의 substring인가]
     PLANNER(scene-planner)
@@ -1703,8 +1703,8 @@ flowchart TD
 
 | 노드 | 유형 | 역할 |
 |---|---|---|
-| `IN` | 도구/입력 | 보도자료 JSON을 입력으로 받는다. |
-| `press-analyst` | Agent | 보도자료 핵심 메시지, 사실, 수치, 인용 후보를 분석한다. |
+| `IN` | 도구/입력 | 민원 JSON을 입력으로 받는다. |
+| `press-analyst` | Agent | 민원 핵심 메시지, 사실, 수치, 인용 후보를 분석한다. |
 | `LEDGER` | 결정적 코드 | `source_quote`가 원문 `body`에 실제 포함되어 있는지 substring 검증을 수행한다. |
 | `scene-planner` | Agent | 영상 전체의 씬 구성, 씬 수, 총 길이, 장면 순서를 설계한다. |
 | `narration-writer` | Agent | 씬별 내레이션, 자막, 앵커 멘트를 작성한다. |
@@ -1752,13 +1752,13 @@ validation-report.json 생성
 video.json 최종 출력 차단
 ```
 
-이 원칙은 공공 콘텐츠 자동 생성에서 중요합니다. 보도자료 기반 영상은 사실 왜곡, 숫자 오류, 출처 없는 인용이 발생하면 기관 신뢰도에 직접 영향을 줄 수 있기 때문입니다.
+이 원칙은 공공 콘텐츠 자동 생성에서 중요합니다. 민원 기반은 사실 왜곡, 숫자 오류, 출처 없는 인용이 발생하면 기관 신뢰도에 직접 영향을 줄 수 있기 때문입니다.
 
 ### 24.7 기존 민원 하네스와의 연결점
 
-| 기존 민원 하네스 | 보도자료 영상 하네스 |
+| 기존 민원 하네스 |  민원 하네스 |
 |---|---|
-| 민원 본문 입력 | 보도자료 JSON 입력 |
+| 민원 본문 입력 | 민원 JSON 입력 |
 | Classifier | press-analyst |
 | Researcher/Specialist | scene-planner, narration-writer, visual-director |
 | Reviewer | fact-reviewer |
@@ -1767,7 +1767,7 @@ video.json 최종 출력 차단
 | 수정 요청 | REWORK 라우팅 |
 | 중단 상태 | fail-closed |
 
-즉, 이 Flowchart는 기존 민원 초안 생성 하네스의 원칙인 **역할 분리, 근거 검증, 재작업 라우팅, 안전 중단**을 보도자료 기반 영상 JSON 생성 업무에 적용한 확장 예시입니다.
+즉, 이 Flowchart는 기존 민원 초안 생성 하네스의 원칙인 **역할 분리, 근거 검증, 재작업 라우팅, 안전 중단**을 민원 기반 영상 JSON 생성 업무에 적용한 확장 예시입니다.
 
 ---
 
