@@ -1640,7 +1640,138 @@ AI Agent 구조는 선택지가 많기 때문에,
 
 ---
 
-## 24. 최종 요약
+
+## 24. 추가 Flowchart: 보도자료 JSON → video.json 생성 검증 파이프라인
+
+이 섹션은 보도자료 JSON을 입력으로 받아 숏폼 또는 홍보 영상 제작용 `video.json`을 생성하는 별도 하네스 흐름 예시입니다.  
+기존 민원 초안 생성 하네스와 동일하게 **Agent 호출 단계**와 **결정적 코드 검증 단계**를 분리하여, 생성 결과가 근거 없이 확정되지 않도록 설계합니다.
+
+### 24.1 흐름도 목적
+
+이 Flowchart의 핵심 목적은 다음과 같습니다.
+
+1. 보도자료 원문(`body`)에서만 근거를 추출한다.
+2. `source_quote`가 실제 원문에 존재하는지 원장 검증으로 확인한다.
+3. 장면 기획, 내레이션, 시각 연출을 서로 다른 Agent가 담당한다.
+4. 병합 후 스키마와 임계값을 결정적 코드로 검증한다.
+5. 검증 실패 시 재작업 라우팅을 수행한다.
+6. 2라운드 재작업 이후에도 치명 오류가 남으면 `fail-closed`로 안전하게 중단한다.
+
+### 24.2 Mermaid Flowchart
+
+```mermaid
+flowchart TD
+    subgraph LEGEND["범례"]
+        direction LR
+        T[도구 노드 - 결정적 코드]
+        Ag(에이전트 노드 - LLM 호출)
+    end
+
+    IN[보도자료 JSON 입력]
+    ANALYST(press-analyst)
+    LEDGER[원장 검증<br/>source_quote가 body의 substring인가]
+    PLANNER(scene-planner)
+    NARR(narration-writer)
+    VISUAL(visual-director)
+    MERGE[병합 · postprocess]
+    GATE1[Gate1 스키마 검증]
+    GATE2[Gate2 임계값 + 원장 앵커]
+    REVIEWER(fact-reviewer)
+    REWORK[재작업 라우팅]
+    OUT[video.json 출력]
+    FAIL[fail-closed: exit 1 + validation-report.json]
+
+    IN --> ANALYST --> LEDGER
+    LEDGER -- "인용 실패: 원장 자체가 날조" --> FAIL
+    LEDGER -- 통과 --> PLANNER
+    PLANNER --> NARR
+    PLANNER --> VISUAL
+    NARR --> MERGE
+    VISUAL --> MERGE
+    MERGE --> GATE1 --> GATE2
+    GATE2 -- 통과 --> REVIEWER
+    GATE2 -- error --> REWORK
+    REVIEWER -- approve --> OUT
+    REVIEWER -- request_changes --> REWORK
+    REWORK -- "씬 수 · 총 길이" --> PLANNER
+    REWORK -- "자막 · 내레이션 · 앵커 · mascot" --> NARR
+    REWORK -- "dataViz · 일러스트 프롬프트" --> VISUAL
+    REWORK -- "2라운드 소진, red 잔존" --> FAIL
+```
+
+### 24.3 노드별 역할
+
+| 노드 | 유형 | 역할 |
+|---|---|---|
+| `IN` | 도구/입력 | 보도자료 JSON을 입력으로 받는다. |
+| `press-analyst` | Agent | 보도자료 핵심 메시지, 사실, 수치, 인용 후보를 분석한다. |
+| `LEDGER` | 결정적 코드 | `source_quote`가 원문 `body`에 실제 포함되어 있는지 substring 검증을 수행한다. |
+| `scene-planner` | Agent | 영상 전체의 씬 구성, 씬 수, 총 길이, 장면 순서를 설계한다. |
+| `narration-writer` | Agent | 씬별 내레이션, 자막, 앵커 멘트를 작성한다. |
+| `visual-director` | Agent | 씬별 시각 연출, dataViz, 일러스트 프롬프트, mascot 사용 여부를 설계한다. |
+| `MERGE` | 결정적 코드 | 기획, 내레이션, 시각 요소를 병합하고 후처리한다. |
+| `GATE1` | 결정적 코드 | `video.json`의 스키마, 필수 필드, 타입, 배열 길이를 검증한다. |
+| `GATE2` | 결정적 코드 | 길이, 씬 수, 앵커 근거, 원장 참조, 임계값을 검증한다. |
+| `fact-reviewer` | Agent | 최종 결과의 사실성, 과장 표현, 원문 근거 일치성을 검토한다. |
+| `REWORK` | 도구/라우터 | 오류 유형에 따라 재작업 대상 Agent를 결정한다. |
+| `OUT` | 출력 | 검증을 통과한 `video.json`을 출력한다. |
+| `FAIL` | 안전 중단 | 검증 실패 시 `exit 1`과 `validation-report.json`을 남기고 종료한다. |
+
+### 24.4 검증 게이트 설계
+
+| Gate | 검증 대상 | 실패 시 처리 |
+|---|---|---|
+| 원장 검증 | `source_quote`가 `body` 원문에 실제 존재하는지 확인 | 실패 시 즉시 `FAIL` 처리 |
+| Gate1 | JSON 스키마, 필수 필드, 데이터 타입, 구조 | `REWORK`로 라우팅 |
+| Gate2 | 씬 수, 총 길이, 앵커 근거, 임계값, 원장 참조 | 오류 유형별 `REWORK` 라우팅 |
+| Fact Review | 사실성, 과장, 오해 가능성, 원문 근거 일치성 | `approve` 또는 `request_changes` |
+
+### 24.5 재작업 라우팅 기준
+
+재작업 라우터는 오류 유형에 따라 담당 Agent를 다시 호출합니다.
+
+| 오류 유형 | 재작업 대상 | 예시 |
+|---|---|---|
+| 씬 수 오류 | `scene-planner` | 씬이 너무 많거나 총 길이가 초과됨 |
+| 총 길이 오류 | `scene-planner` | 목표 영상 길이보다 길거나 짧음 |
+| 자막 오류 | `narration-writer` | 자막이 장황하거나 핵심 메시지가 누락됨 |
+| 내레이션 오류 | `narration-writer` | 내레이션이 원문 근거보다 과장됨 |
+| 앵커 멘트 오류 | `narration-writer` | 앵커 표현이 공공 홍보 문체에 맞지 않음 |
+| mascot 오류 | `narration-writer` 또는 `visual-director` | 캐릭터 사용 위치가 부적절함 |
+| dataViz 오류 | `visual-director` | 수치 시각화가 원문 근거와 불일치함 |
+| 일러스트 프롬프트 오류 | `visual-director` | 이미지 프롬프트가 사실과 무관하거나 과장됨 |
+| red 잔존 | `FAIL` | 2라운드 재작업 후에도 치명 오류가 남음 |
+
+### 24.6 fail-closed 원칙
+
+이 흐름은 검증 실패를 무시하고 결과를 내보내지 않습니다. 특히 원문 인용이 실패하거나, 2라운드 재작업 이후에도 `red` 수준의 오류가 남아 있으면 다음 방식으로 안전하게 종료합니다.
+
+```text
+exit 1
+validation-report.json 생성
+video.json 최종 출력 차단
+```
+
+이 원칙은 공공 콘텐츠 자동 생성에서 중요합니다. 보도자료 기반 영상은 사실 왜곡, 숫자 오류, 출처 없는 인용이 발생하면 기관 신뢰도에 직접 영향을 줄 수 있기 때문입니다.
+
+### 24.7 기존 민원 하네스와의 연결점
+
+| 기존 민원 하네스 | 보도자료 영상 하네스 |
+|---|---|
+| 민원 본문 입력 | 보도자료 JSON 입력 |
+| Classifier | press-analyst |
+| Researcher/Specialist | scene-planner, narration-writer, visual-director |
+| Reviewer | fact-reviewer |
+| 검증 Agent | Gate1, Gate2, 원장 검증, fact-reviewer |
+| 민원 답변 초안 | video.json |
+| 수정 요청 | REWORK 라우팅 |
+| 중단 상태 | fail-closed |
+
+즉, 이 Flowchart는 기존 민원 초안 생성 하네스의 원칙인 **역할 분리, 근거 검증, 재작업 라우팅, 안전 중단**을 보도자료 기반 영상 JSON 생성 업무에 적용한 확장 예시입니다.
+
+---
+
+## 25. 최종 요약
 
 이 프로젝트는 다음 네 가지를 동시에 만족하는 것을 목표로 합니다.
 
