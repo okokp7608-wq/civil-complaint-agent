@@ -2,7 +2,7 @@
 
 > **Civil Complaint Draft Generator Harness**  
 > `82-report-generator`의 하네스 구조를 민원 업무에 맞게 고도화한 프로젝트입니다.  
-> 민원 제목과 본문을 입력하면 여러 AI Agent가 **분류 → 조사 → 초안 작성 → 검증 → 사용자 승인 → 출력** 흐름으로 협업하여 공공기관 민원 답변 초안을 생성합니다.
+> 민원 제목과 본문을 입력하면 여러 AI Agent가 **분류 → 조사 → 초안 작성 → 검증 → 사용자 승인 → 출력** 흐름으로 협업하여 공공기관 민원 답변 초안을생성합니다.
 
 GitHub: `https://github.com/okokp7608-wq/civil-complaint-agent`
 
